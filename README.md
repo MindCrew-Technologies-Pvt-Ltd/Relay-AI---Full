@@ -5,11 +5,13 @@ from the hero contact form, stores them in PostgreSQL, and (optionally) emails
 you whenever someone submits.
 
 ```
-index-b.html      the live site (Version B — emerald)
-index.html        Version A (earlier blue concept, kept for reference)
+index-b.html      the live site (emerald)
 css/ js/ assets/  front-end
 server.js         Express server: static site + /api/enquiry + /admin
 ```
+
+An earlier blue concept (`index.html`, "Version A") was removed once Version B
+was approved; it remains in the git history if it is ever needed again.
 
 ---
 

@@ -1619,27 +1619,20 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; }
   color: var(--muted-on-dark);
   font-size: 0.95rem;
 }
+/* single element: circle + centred tick, so the glyph can't drift */
 .contact-panel__points li::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 0.15em;
+  top: 0.1em;
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(142, 213, 192, 0.16);
+  background-color: rgba(142, 213, 192, 0.16);
   border: 1px solid var(--border-on-dark);
-}
-.contact-panel__points li::after {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: 0.5em;
-  width: 6px;
-  height: 3px;
-  border-left: 1.6px solid var(--blue-300);
-  border-bottom: 1.6px solid var(--blue-300);
-  transform: rotate(-45deg);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 4.8 8.5 9.5 3.8' fill='none' stroke='%238ED5C0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .contact-panel__channels { display: grid; gap: 0.9rem; }
