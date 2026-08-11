@@ -8,10 +8,15 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || "";
+const SESSION_SECRET = process.env.SESSION_SECRET || ADMIN_TOKEN || "dev-secret";
+const SESSION_HOURS = 12;
 const DATA_FILE = path.join(__dirname, "data", "enquiries.json");
 
 app.set("trust proxy", 1);
@@ -164,18 +169,135 @@ app.post("/api/enquiry", async (req, res) => {
   }
 });
 
-function checkToken(req, res) {
-  if (!ADMIN_TOKEN) {
-    res.status(503).send("ADMIN_TOKEN is not set on the server.");
-    return false;
-  }
-  const token = req.query.token || (req.headers.authorization || "").replace("Bearer ", "");
-  if (token !== ADMIN_TOKEN) {
-    res.status(401).send("Unauthorized — add ?token=YOUR_ADMIN_TOKEN to the URL.");
-    return false;
-  }
-  return true;
+/* ------------------------------------------------------------------- auth */
+/** Hash a password as salt:hash using scrypt. */
+function hashPassword(password, salt) {
+  const s = salt || crypto.randomBytes(16).toString("hex");
+  const derived = crypto.scryptSync(String(password), s, 64).toString("hex");
+  return `${s}:${derived}`;
 }
+
+function verifyPassword(password, stored) {
+  if (!stored || !stored.includes(":")) return false;
+  const [salt] = stored.split(":");
+  const a = Buffer.from(hashPassword(password, salt));
+  const b = Buffer.from(stored);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function signSession(expiresAt) {
+  const payload = String(expiresAt);
+  const sig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
+  return `${payload}.${sig}`;
+}
+
+function validSession(cookie) {
+  if (!cookie || !cookie.includes(".")) return false;
+  const [payload, sig] = cookie.split(".");
+  const expected = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
+  const a = Buffer.from(sig || "");
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
+  return Number(payload) > Date.now();
+}
+
+function readCookie(req, name) {
+  const raw = req.headers.cookie || "";
+  const hit = raw.split(";").map((c) => c.trim()).find((c) => c.startsWith(name + "="));
+  return hit ? decodeURIComponent(hit.slice(name.length + 1)) : "";
+}
+
+/** Session cookie, or ?token= for programmatic access. */
+function isAuthed(req) {
+  if (validSession(readCookie(req, "relay_admin"))) return true;
+  const token = req.query.token || (req.headers.authorization || "").replace("Bearer ", "");
+  return Boolean(ADMIN_TOKEN) && token === ADMIN_TOKEN;
+}
+
+function checkToken(req, res) {
+  if (isAuthed(req)) return true;
+  if (req.path.startsWith("/api/")) {
+    res.status(401).json({ ok: false, message: "Unauthorized. Sign in at /admin." });
+  } else {
+    res.redirect("/admin/login");
+  }
+  return false;
+}
+
+function loginPage(message) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Relay AI — Admin sign in</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101412;
+    font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:#101412;padding:1.5rem}
+  form{background:#fff;padding:2rem;border-radius:16px;width:min(380px,100%);
+    box-shadow:0 30px 60px rgba(0,0,0,.4)}
+  h1{font-size:1.25rem;margin:0 0 .35rem}
+  p.sub{margin:0 0 1.5rem;color:#68706C;font-size:.9rem}
+  label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;
+    letter-spacing:.05em;color:#68706C;margin-bottom:.4rem}
+  input{width:100%;padding:.7rem .85rem;border:1px solid #CDCABF;border-radius:10px;
+    font-size:.95rem;margin-bottom:1rem}
+  input:focus{outline:none;border-color:#0F8B6D;box-shadow:0 0 0 3px rgba(15,139,109,.16)}
+  button{width:100%;padding:.8rem;border:0;border-radius:999px;background:#101412;color:#fff;
+    font-weight:600;font-size:.95rem;cursor:pointer}
+  button:hover{background:#0F8B6D}
+  .err{background:#FDECEA;border:1px solid #F5C2BC;color:#A93226;padding:.6rem .8rem;
+    border-radius:8px;font-size:.85rem;margin-bottom:1rem}
+</style></head><body>
+<form method="POST" action="/admin/login">
+  <h1>Relay AI</h1><p class="sub">Sign in to view enquiries</p>
+  ${message ? `<div class="err">${message}</div>` : ""}
+  <label for="email">Email</label>
+  <input id="email" name="email" type="email" autocomplete="username" required autofocus>
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" required>
+  <button type="submit">Sign in</button>
+</form></body></html>`;
+}
+
+app.get("/admin/login", (req, res) => {
+  if (isAuthed(req)) return res.redirect("/admin");
+  res.send(loginPage(""));
+});
+
+const loginAttempts = new Map();
+app.post("/admin/login", (req, res) => {
+  const ip = req.ip || "";
+  const now = Date.now();
+  const recent = (loginAttempts.get(ip) || []).filter((t) => now - t < 15 * 60 * 1000);
+  if (recent.length >= 8) {
+    return res.status(429).send(loginPage("Too many attempts. Try again in 15 minutes."));
+  }
+
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD_HASH) {
+    return res.status(503).send(loginPage("Admin login is not configured on the server."));
+  }
+
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const password = String(req.body.password || "");
+  if (email !== ADMIN_EMAIL || !verifyPassword(password, ADMIN_PASSWORD_HASH)) {
+    recent.push(now);
+    loginAttempts.set(ip, recent);
+    return res.status(401).send(loginPage("Incorrect email or password."));
+  }
+
+  loginAttempts.delete(ip);
+  const expiresAt = now + SESSION_HOURS * 60 * 60 * 1000;
+  res.cookie("relay_admin", signSession(expiresAt), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: req.protocol === "https" || req.get("x-forwarded-proto") === "https",
+    maxAge: SESSION_HOURS * 60 * 60 * 1000,
+  });
+  res.redirect("/admin");
+});
+
+app.post("/admin/logout", (req, res) => {
+  res.clearCookie("relay_admin");
+  res.redirect("/admin/login");
+});
 
 app.get("/api/enquiries", async (req, res) => {
   if (!checkToken(req, res)) return;
@@ -212,7 +334,11 @@ app.get("/admin", async (req, res) => {
   header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
     flex-wrap:wrap;padding:1.25rem 1.5rem;background:#101412;color:#F8F6EF}
   h1{font-size:1.1rem;margin:0}
-  a.btn{background:#0F8B6D;color:#fff;padding:.5rem 1rem;border-radius:999px;text-decoration:none;font-size:.85rem}
+  .actions{display:flex;gap:.6rem;align-items:center}
+  .btn{background:#0F8B6D;color:#fff;padding:.5rem 1rem;border-radius:999px;
+    text-decoration:none;font-size:.85rem;border:0;cursor:pointer;font-family:inherit}
+  .btn--ghost{background:transparent;border:1px solid rgba(248,246,239,.35);color:#F8F6EF}
+  .btn--ghost:hover{background:rgba(248,246,239,.12)}
   .wrap{padding:1.5rem;overflow-x:auto}
   table{border-collapse:collapse;width:100%;background:#fff;border-radius:10px;overflow:hidden;min-width:760px}
   th,td{padding:.7rem .9rem;text-align:left;border-bottom:1px solid #E3E0D5;font-size:.9rem;white-space:nowrap}
@@ -222,7 +348,10 @@ app.get("/admin", async (req, res) => {
   .empty{padding:2rem;text-align:center;color:#68706C}
 </style></head><body>
 <header><h1>Relay AI — Enquiries (${rows.length})</h1>
-<a class="btn" href="/api/enquiries.csv?token=${encodeURIComponent(req.query.token || "")}">Download CSV</a></header>
+<div class="actions">
+  <a class="btn" href="/api/enquiries.csv${req.query.token ? "?token=" + encodeURIComponent(req.query.token) : ""}">Download CSV</a>
+  <form method="POST" action="/admin/logout"><button class="btn btn--ghost" type="submit">Sign out</button></form>
+</div></header>
 <div class="wrap">${
     rows.length
       ? `<table><thead><tr><th>#</th><th>Received</th><th>Name</th><th>Email</th><th>Phone</th><th>Requirement</th></tr></thead><tbody>${rows

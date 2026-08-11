@@ -53,12 +53,22 @@ Every submission is written to the `enquiries` table in PostgreSQL:
 
 **Three ways to read it:**
 
-- **Admin page** — `https://YOUR-DOMAIN/admin?token=YOUR_ADMIN_TOKEN`
-  A table of every enquiry, newest first, with a **Download CSV** button.
-- **CSV export** — `https://YOUR-DOMAIN/api/enquiries.csv?token=YOUR_ADMIN_TOKEN`
-  Opens straight in Excel / Google Sheets.
+- **Admin page** — `https://YOUR-DOMAIN/admin`
+  Sign in with `ADMIN_EMAIL` and your password. A table of every enquiry,
+  newest first, with **Download CSV** and **Sign out**. Sessions last 12 hours.
+- **CSV export** — `https://YOUR-DOMAIN/api/enquiries.csv` once signed in, or
+  `…?token=YOUR_ADMIN_TOKEN` for scripts and scheduled exports.
 - **Email** — set the SMTP variables above and you get a message per enquiry,
   with the visitor's address as `Reply-To`, so you can reply directly.
+
+### Changing the admin password
+
+Generate a new hash and update the variable — the plain password is never stored:
+
+```bash
+node -e "const c=require('crypto');const s=c.randomBytes(16).toString('hex');console.log(s+':'+c.scryptSync('NEW-PASSWORD',s,64).toString('hex'))"
+railway variables --service Relay-AI---Full --set "ADMIN_PASSWORD_HASH=<paste>"
+```
 
 You can also browse the table in Railway: **PostgreSQL service → Data**.
 
