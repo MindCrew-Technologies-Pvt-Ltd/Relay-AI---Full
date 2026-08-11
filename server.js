@@ -240,8 +240,10 @@ app.get("/admin", async (req, res) => {
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
 /* --------------------------------------------------------- static website */
-app.use(express.static(__dirname, { extensions: ["html"] }));
+// "/" must resolve to Version B, so the static handler must not answer it
+// with its default index.html (that is Version A).
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index-b.html")));
+app.use(express.static(__dirname, { index: false, extensions: ["html"] }));
 
 initDb()
   .then(() => app.listen(PORT, () => console.log(`Relay AI running on port ${PORT}`)))
