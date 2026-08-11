@@ -1492,6 +1492,79 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; }
 .footer__legal a { transition: color 0.18s var(--ease); }
 .footer__legal a:hover { color: var(--text-on-dark); }
 
+/* ---------- Legal pages (privacy, terms) ---------- */
+.legal {
+  padding-top: calc(76px + clamp(2rem, 5vw, 3.5rem));
+  padding-bottom: clamp(3rem, 6vw, 4.5rem);
+  background: var(--bg);
+}
+.container--legal { max-width: 760px; }
+.legal__eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue-600);
+  margin-bottom: 0.8rem;
+}
+.legal__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+.legal__meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+.legal__notice {
+  background: rgba(15, 139, 109, 0.08);
+  border: 1px solid rgba(15, 139, 109, 0.22);
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  margin-bottom: 2.5rem;
+}
+.legal h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 2.25rem 0 0.7rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.legal h2:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.legal h3 {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 600;
+  margin: 1.4rem 0 0.5rem;
+}
+.legal p { color: var(--text-soft); margin-bottom: 0.9rem; line-height: 1.7; }
+.legal ul { display: grid; gap: 0.55rem; margin: 0 0 1.1rem; }
+.legal li {
+  position: relative;
+  padding-left: 1.4rem;
+  color: var(--text-soft);
+  line-height: 1.65;
+}
+.legal li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue-400);
+}
+.legal strong { color: var(--text); font-weight: 600; }
+.legal a { color: var(--blue-600); text-decoration: underline; text-underline-offset: 3px; }
+.legal a:hover { color: var(--navy-900); }
+.legal__back { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.legal__back a { font-family: var(--font-display); font-weight: 600; text-decoration: none; }
+
 /* ---------- Version switcher ---------- */
 .version-switch {
   position: fixed;
