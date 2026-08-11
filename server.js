@@ -73,6 +73,17 @@ async function saveEnquiry(rec) {
   return { id: row.id, createdAt: row.createdAt };
 }
 
+async function deleteEnquiry(id) {
+  if (pool) {
+    const { rowCount } = await pool.query(`DELETE FROM enquiries WHERE id = $1`, [id]);
+    return rowCount > 0;
+  }
+  const all = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  const next = all.filter((r) => Number(r.id) !== Number(id));
+  fs.writeFileSync(DATA_FILE, JSON.stringify(next, null, 2));
+  return next.length !== all.length;
+}
+
 async function listEnquiries() {
   if (pool) {
     const { rows } = await pool.query(
@@ -306,6 +317,16 @@ app.post("/admin/login", (req, res) => {
   res.redirect("/admin");
 });
 
+app.post("/admin/enquiries/:id/delete", async (req, res) => {
+  if (!checkToken(req, res)) return;
+  try {
+    await deleteEnquiry(req.params.id);
+  } catch (err) {
+    console.error("Delete failed:", err);
+  }
+  res.redirect("/admin");
+});
+
 app.post("/admin/logout", (req, res) => {
   res.clearCookie("relay_admin");
   res.redirect("/admin/login");
@@ -359,8 +380,12 @@ app.get("/admin", async (req, res) => {
   th{background:#F1EFE6;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:#68706C}
   tr:last-child td{border-bottom:0}
   .tag{background:#0F8B6D14;color:#0F8B6D;padding:.2rem .6rem;border-radius:999px;font-size:.8rem}
-  td.msg{white-space:normal;min-width:260px;max-width:420px;color:#3D443F}
+  td.msg{white-space:normal;min-width:240px;max-width:400px;color:#3D443F}
   .muted{color:#A7ADA9}
+  .del{background:transparent;border:1px solid #E3E0D5;color:#A93226;padding:.35rem .8rem;
+    border-radius:999px;font-size:.8rem;cursor:pointer;font-family:inherit;transition:.15s}
+  .del:hover{background:#A93226;border-color:#A93226;color:#fff}
+  tbody tr:hover{background:#FBFAF6}
   .empty{padding:2rem;text-align:center;color:#68706C}
 </style></head><body>
 <header><h1>Relay AI — Enquiries (${rows.length})</h1>
@@ -370,13 +395,18 @@ app.get("/admin", async (req, res) => {
 </div></header>
 <div class="wrap">${
     rows.length
-      ? `<table><thead><tr><th>#</th><th>Received</th><th>Name</th><th>Email</th><th>Phone</th><th>Requirement</th><th>Message</th></tr></thead><tbody>${rows
+      ? `<table><thead><tr><th>#</th><th>Received</th><th>Name</th><th>Email</th><th>Phone</th><th>Requirement</th><th>Message</th><th></th></tr></thead><tbody>${rows
           .map(
-            (r) => `<tr><td>${r.id}</td><td>${esc(new Date(r.createdAt).toLocaleString())}</td>
+            // rows arrive newest-first, so the newest enquiry is always #1
+            (r, i) => `<tr><td>${i + 1}</td><td>${esc(new Date(r.createdAt).toLocaleString())}</td>
       <td>${esc(r.fullName)}</td><td><a href="mailto:${esc(r.email)}">${esc(r.email)}</a></td>
       <td>${esc((r.countryCode || "") + " " + r.phone)}</td>
       <td><span class="tag">${esc(r.requirement)}</span></td>
-      <td class="msg">${r.message ? esc(r.message) : '<span class="muted">—</span>'}</td></tr>`
+      <td class="msg">${r.message ? esc(r.message) : '<span class="muted">—</span>'}</td>
+      <td><form method="POST" action="/admin/enquiries/${r.id}/delete"
+            onsubmit="return confirm('Delete the enquiry from ${esc(r.fullName).replace(/'/g, "\\'")}? This cannot be undone.')">
+        <button class="del" type="submit" title="Delete this enquiry" aria-label="Delete enquiry from ${esc(r.fullName)}">Delete</button>
+      </form></td></tr>`
           )
           .join("")}</tbody></table>`
       : `<p class="empty">No enquiries yet.</p>`
