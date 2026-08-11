@@ -1,0 +1,13 @@
+node_modules/
+data/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+.claude/
+
+# stale host config / duplicate source material
+.netlify/
+WhatsApp Image*.jpeg
