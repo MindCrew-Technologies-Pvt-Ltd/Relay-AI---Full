@@ -251,13 +251,37 @@
       return "";
     },
     phone: function (value) {
-      if (!value.trim()) return "Please enter your phone number.";
-      var digits = value.replace(/\D/g, "");
+      var raw = value.trim();
+      if (!raw) return "Please enter your phone number.";
+      if (/[^0-9]/.test(raw)) return "Please enter digits only.";
       // national number only — the country code lives in its own select
-      if (digits.length < 6 || digits.length > 14) return "Please enter a valid phone number.";
+      if (raw.length < 6) return "Phone number is too short.";
+      if (raw.length > 15) return "Phone number cannot exceed 15 digits.";
       return "";
     }
   };
+
+  /* phone accepts digits only, capped at 15 — applies to typing and pasting */
+  var phoneInput = document.getElementById("phone");
+  if (phoneInput) {
+    var MAX_PHONE_DIGITS = 15;
+    phoneInput.addEventListener("input", function () {
+      var cleaned = phoneInput.value.replace(/\D/g, "").slice(0, MAX_PHONE_DIGITS);
+      if (cleaned !== phoneInput.value) {
+        var atEnd = phoneInput.selectionStart === phoneInput.value.length;
+        var pos = phoneInput.selectionStart - (phoneInput.value.length - cleaned.length);
+        phoneInput.value = cleaned;
+        if (!atEnd) {
+          var caret = Math.max(0, Math.min(cleaned.length, pos));
+          phoneInput.setSelectionRange(caret, caret);
+        }
+      }
+    });
+    // block letter keys outright so nothing flashes on screen
+    phoneInput.addEventListener("keypress", function (e) {
+      if (e.key && e.key.length === 1 && !/[0-9]/.test(e.key)) e.preventDefault();
+    });
+  }
 
   ["fullName", "email", "phone"].forEach(function (name) {
     var input = document.getElementById(name);
@@ -271,6 +295,23 @@
       }
     });
   });
+
+  /* message: live character counter, hard cap at 500 */
+  var messageInput = document.getElementById("message");
+  var messageCount = document.getElementById("messageCount");
+  if (messageInput && messageCount) {
+    var MAX_MESSAGE = 500;
+    var updateCount = function () {
+      if (messageInput.value.length > MAX_MESSAGE) {
+        messageInput.value = messageInput.value.slice(0, MAX_MESSAGE);
+      }
+      var used = messageInput.value.length;
+      messageCount.textContent = used;
+      messageCount.parentNode.classList.toggle("is-near", used > MAX_MESSAGE - 50);
+    };
+    messageInput.addEventListener("input", updateCount);
+    updateCount();
+  }
 
   var requirementRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="requirement"]'));
   var requirementFieldset = document.querySelector(".form__fieldset");
@@ -434,6 +475,32 @@
     smoothScrollTo(Math.max(0, target.offsetTop - offset), 950);
     if (history.pushState) history.pushState(null, "", link.getAttribute("href"));
   });
+
+  /* ---------- "Send another enquiry" ---------- */
+  var sendAnother = document.getElementById("sendAnother");
+  if (sendAnother) {
+    sendAnother.addEventListener("click", function () {
+      form.reset();
+      if (messageInput && messageCount) {
+        messageCount.textContent = "0";
+        messageCount.parentNode.classList.remove("is-near");
+      }
+      Array.prototype.slice.call(form.querySelectorAll(".has-error")).forEach(function (f) {
+        f.classList.remove("has-error");
+      });
+      Array.prototype.slice.call(form.querySelectorAll(".form__error")).forEach(function (e) {
+        e.textContent = "";
+      });
+      successPanel.hidden = true;
+      form.hidden = false;
+      submitBtn.classList.remove("is-loading");
+      submitBtn.removeAttribute("aria-busy");
+      submitBtn.querySelector(".form__submit-label").textContent = "Submit";
+      var status = document.getElementById("formStatus");
+      if (status) status.hidden = true;
+      document.getElementById("fullName").focus();
+    });
+  }
 
   /* ---------- Footer year ---------- */
   var yearEl = document.getElementById("year");

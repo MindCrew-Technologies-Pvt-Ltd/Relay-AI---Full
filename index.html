@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=15">
+  <link rel="stylesheet" href="css/styles.css?v=27">
 </head>
 <body>
 
@@ -435,7 +435,9 @@
 
             <div class="form__field">
               <label for="phone" class="form__label">Phone Number</label>
-              <input type="tel" id="phone" name="phone" class="form__input" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" required>
+              <input type="tel" id="phone" name="phone" class="form__input" autocomplete="tel"
+                     inputmode="numeric" pattern="[0-9]*" maxlength="15"
+                     placeholder="9876543210" required>
               <p class="form__error" id="phone-error" aria-live="polite"></p>
             </div>
 
@@ -531,7 +533,7 @@
     </div>
   </footer>
 
-  <script src="js/main.js?v=15" defer></script>
+  <script src="js/main.js?v=27" defer></script>
 <!-- Version switcher -->
   <nav class="version-switch" aria-label="Design versions">
     <a href="index.html" class="version-switch__link is-current">A</a>

@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=26">
+  <link rel="stylesheet" href="css/styles.css?v=28">
   <!-- Hide-then-reveal only when JS can restore it -->
   <script>document.documentElement.classList.add('js');</script>
   <noscript><style>.reveal,.seq{opacity:1!important;transform:none!important}</style></noscript>
@@ -109,7 +109,9 @@
                       <option value="+81">🇯🇵 +81</option>
                       <option value="+27">🇿🇦 +27</option>
                     </select>
-                    <input type="tel" id="phone" name="phone" class="form__input" autocomplete="tel" inputmode="tel" placeholder="98765 43210" required>
+                    <input type="tel" id="phone" name="phone" class="form__input" autocomplete="tel"
+                           inputmode="numeric" pattern="[0-9]*" maxlength="15"
+                           placeholder="9876543210" required>
                   </div>
                   <p class="form__error" id="phone-error" aria-live="polite"></p>
                 </div>
@@ -133,6 +135,13 @@
                   </div>
                   <p class="form__error" id="requirement-error" aria-live="polite"></p>
                 </fieldset>
+                <div class="form__field">
+                  <label for="message" class="form__label">Message <span class="form__optional">(optional)</span></label>
+                  <textarea id="message" name="message" class="form__input form__textarea" rows="3"
+                            maxlength="500" placeholder="Tell us a little about what you need…"></textarea>
+                  <p class="form__counter"><span id="messageCount">0</span>/500</p>
+                  <p class="form__error" id="message-error" aria-live="polite"></p>
+                </div>
                 <p class="form__status" id="formStatus" role="alert" hidden></p>
                 <button type="submit" class="btn btn--primary btn--lg form__submit" id="submitBtn">
                   <span class="form__submit-label">Submit</span>
@@ -144,7 +153,8 @@
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </span>
                 <h3 class="form-success__title">Thank you! Your enquiry has been received.</h3>
-                <p class="form-success__text">We've received your requirement and the Relay AI team will review it. If we identify a relevant partner from our network, we'll share their details with you.</p>
+                <p class="form-success__text">The Relay AI team will review it. If we identify a relevant partner from our network, we'll share their details with you.</p>
+                <button type="button" class="form-success__again" id="sendAnother">Send another enquiry</button>
               </div>
             </div>
           </div>
@@ -385,7 +395,7 @@
     </div>
   </footer>
 
-  <script src="js/main.js?v=26" defer></script>
+  <script src="js/main.js?v=28" defer></script>
 
   
   <!-- Version switcher -->

@@ -46,20 +46,23 @@ async function initDb() {
       country_code TEXT,
       phone        TEXT        NOT NULL,
       requirement  TEXT        NOT NULL,
+      message      TEXT,
       source       TEXT,
       ip           TEXT,
       created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // added after first release — safe to run repeatedly
+  await pool.query(`ALTER TABLE enquiries ADD COLUMN IF NOT EXISTS message TEXT`);
   console.log("Connected to PostgreSQL — enquiries table ready");
 }
 
 async function saveEnquiry(rec) {
   if (pool) {
     const { rows } = await pool.query(
-      `INSERT INTO enquiries (full_name, email, country_code, phone, requirement, source, ip)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at`,
-      [rec.fullName, rec.email, rec.countryCode, rec.phone, rec.requirement, rec.source, rec.ip]
+      `INSERT INTO enquiries (full_name, email, country_code, phone, requirement, message, source, ip)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, created_at`,
+      [rec.fullName, rec.email, rec.countryCode, rec.phone, rec.requirement, rec.message, rec.source, rec.ip]
     );
     return { id: rows[0].id, createdAt: rows[0].created_at };
   }
@@ -74,7 +77,7 @@ async function listEnquiries() {
   if (pool) {
     const { rows } = await pool.query(
       `SELECT id, full_name AS "fullName", email, country_code AS "countryCode",
-              phone, requirement, source, created_at AS "createdAt"
+              phone, requirement, message, source, created_at AS "createdAt"
          FROM enquiries ORDER BY id DESC`
     );
     return rows;
@@ -104,6 +107,9 @@ async function notify(rec) {
       `Phone:       ${rec.countryCode || ""} ${rec.phone}`,
       `Requirement: ${rec.requirement}`,
       `Received:    ${new Date().toISOString()}`,
+      "",
+      `Message:`,
+      rec.message || "(none)",
     ].join("\n"),
   });
 }
@@ -115,15 +121,21 @@ function validate(body) {
   const email = String(body.email || "").trim();
   const phone = String(body.phone || "").trim();
   const requirement = String(body.requirement || "").trim().toLowerCase();
+  const message = String(body.message || "").trim().slice(0, 500);
 
   if (fullName.length < 2) errors.fullName = "Please enter your name.";
+  if (String(body.message || "").trim().length > 500) {
+    errors.message = "Message cannot exceed 500 characters.";
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = "Please enter a valid email address.";
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 6 || digits.length > 14) errors.phone = "Please enter a valid phone number.";
+  // digits only, 6–15 (E.164 allows at most 15 digits)
+  if (/[^0-9]/.test(phone)) errors.phone = "Please enter digits only.";
+  else if (phone.length < 6) errors.phone = "Phone number is too short.";
+  else if (phone.length > 15) errors.phone = "Phone number cannot exceed 15 digits.";
   if (requirement !== "development" && requirement !== "marketing") {
     errors.requirement = "Please select Development or Marketing.";
   }
-  return { errors, value: { fullName, email, phone, requirement } };
+  return { errors, value: { fullName, email, phone, requirement, message } };
 }
 
 /* ---------------------------------------------------------------- rate cap */
@@ -309,9 +321,11 @@ app.get("/api/enquiries.csv", async (req, res) => {
   const rows = await listEnquiries();
   const esc = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
   const csv = [
-    ["id", "created_at", "full_name", "email", "country_code", "phone", "requirement"].join(","),
+    ["id", "created_at", "full_name", "email", "country_code", "phone", "requirement", "message"].join(","),
     ...rows.map((r) =>
-      [r.id, r.createdAt, r.fullName, r.email, r.countryCode, r.phone, r.requirement].map(esc).join(",")
+      [r.id, r.createdAt, r.fullName, r.email, r.countryCode, r.phone, r.requirement, r.message]
+        .map(esc)
+        .join(",")
     ),
   ].join("\n");
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -345,6 +359,8 @@ app.get("/admin", async (req, res) => {
   th{background:#F1EFE6;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:#68706C}
   tr:last-child td{border-bottom:0}
   .tag{background:#0F8B6D14;color:#0F8B6D;padding:.2rem .6rem;border-radius:999px;font-size:.8rem}
+  td.msg{white-space:normal;min-width:260px;max-width:420px;color:#3D443F}
+  .muted{color:#A7ADA9}
   .empty{padding:2rem;text-align:center;color:#68706C}
 </style></head><body>
 <header><h1>Relay AI — Enquiries (${rows.length})</h1>
@@ -354,12 +370,13 @@ app.get("/admin", async (req, res) => {
 </div></header>
 <div class="wrap">${
     rows.length
-      ? `<table><thead><tr><th>#</th><th>Received</th><th>Name</th><th>Email</th><th>Phone</th><th>Requirement</th></tr></thead><tbody>${rows
+      ? `<table><thead><tr><th>#</th><th>Received</th><th>Name</th><th>Email</th><th>Phone</th><th>Requirement</th><th>Message</th></tr></thead><tbody>${rows
           .map(
             (r) => `<tr><td>${r.id}</td><td>${esc(new Date(r.createdAt).toLocaleString())}</td>
       <td>${esc(r.fullName)}</td><td><a href="mailto:${esc(r.email)}">${esc(r.email)}</a></td>
       <td>${esc((r.countryCode || "") + " " + r.phone)}</td>
-      <td><span class="tag">${esc(r.requirement)}</span></td></tr>`
+      <td><span class="tag">${esc(r.requirement)}</span></td>
+      <td class="msg">${r.message ? esc(r.message) : '<span class="muted">—</span>'}</td></tr>`
           )
           .join("")}</tbody></table>`
       : `<p class="empty">No enquiries yet.</p>`
